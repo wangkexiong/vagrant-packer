@@ -1,0 +1,8 @@
+
+builds
+*_cache
+*.swp
+
+test*.json
+**/*-mirror.cfg
+working.cmd

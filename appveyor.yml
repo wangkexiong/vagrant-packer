@@ -1,0 +1,56 @@
+os: Visual Studio 2019
+
+branches:
+  only:
+    - nonexisted
+
+platform:
+  - x64
+
+environment:
+  APPVEYOR_SAVE_CACHE_ON_ERROR: true
+  APPVEYOR_RDP_PASSWORD:
+    secure: oJsLc0Vg5ufozYTg0DdnwQ==
+  VAGRANT_CLOUD_TOKEN:
+    secure: dklfRYW6oLg+5Bg5lreF0qN9zUWKcyMdTSiUA9OjHklP4ICl9CJ1F4WQDIbX32uMFsYcbvptb48+DcU4xpAxmjcTmmBiLkyVJwRURWfwaYB0KX8Bcu1cfr5HATmwVMxs
+
+cache:
+  - appveyor_cache
+
+#init:
+#  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - ps: .\powershell\config.choco.for.appveyor.ps1
+  - cinst packer --version 1.5.6
+  - refreshenv
+
+build_script:
+  - ps: .\working.ps1
+  - DIR /T:W appveyor_cache
+  - IF DEFINED HYPERV_JOB ( powershell .\powershell\enable.vmnet8.for.hyperv.ps1 )
+  - IF DEFINED HYPERV_JOB ( packer build -only hyperv-iso -var hyperv_switch=vmnet8 %HYPERV_JOB% )
+  - ps: If (Get-Item builds\*hyperv.box -ErrorAction Ignore) { Get-Date | Out-File -FilePath "appveyor_cache\$Env:HYPERV_JOB.hyperv" }
+  - IF DEFINED VIRTUALBOX_JOB ( CALL dism.exe /Online /Disable-Feature:Microsoft-Hyper-V /Quiet )
+  - IF DEFINED VIRTUALBOX_JOB ( cinst virtualbox )
+  - IF DEFINED VIRTUALBOX_JOB ( CALL RefreshEnv.cmd )
+  - IF DEFINED VIRTUALBOX_JOB ( packer build -only virtualbox-iso %VIRTUALBOX_JOB% )
+  - ps: If (Get-Item builds\*virtualbox.box -ErrorAction Ignore) { Get-Date | Out-File -FilePath "appveyor_cache\$Env:VIRTUALBOX_JOB.virtualbox" }
+
+after_build:
+  - DIR /T:W appveyor_cache
+
+#   - ps: $WORKING_DIR=Get-Location
+#   - ps: $SCRIPT="$WORKING_DIR\powershell\config.packer.jobs.ps1"
+#   - ps: $BLOCK={& $args[0] $args[1] $args[2]}
+#   - ps: $Job1=Start-Job -ScriptBlock $BLOCK -ArgumentList "$SCRIPT", "$WORKING_DIR", "ubuntu-xenial-amd64.json"
+#   - ps: $Job2=Start-Job -ScriptBlock $BLOCK -ArgumentList "$SCRIPT", "$WORKING_DIR", "ubuntu-bionic-amd64.json"
+#   - ps: $Job3=Start-Job -ScriptBlock $BLOCK -ArgumentList "$SCRIPT", "$WORKING_DIR", "ubuntu-focal-amd64.json"
+#   - ps: $JOBS=Get-Job
+#   - ps: While ($JOBS.state -eq "Running") {date; Get-Job; echo ""; sleep 300}
+#   - ps: Receive-Job $Job1
+#   - ps: Receive-Job $Job2
+#   - ps: Receive-Job $Job3
+
+#on_finish:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
